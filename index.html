@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presupuesto DGEMPRE — Dashboard en vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#153244; --navy-2:#1e4258; --gold:#F5C400;
+    --ink:#1b2733; --muted:#6b7a88; --line:#e3e8ec;
+    --bg:#f5f7f9; --card:#ffffff; --bad:#c0392b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Montserrat',sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+  header{background:var(--navy);color:#fff;padding:24px 36px;border-bottom:4px solid var(--gold);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+  header h1{font-size:19px;font-weight:700}
+  header .sub{font-size:12px;font-weight:500;color:#b8c6d0;margin-top:5px}
+  header .sub b{color:var(--gold);font-weight:600}
+  .refresh{display:flex;align-items:center;gap:12px}
+  .stamp{font-size:11px;color:#b8c6d0;text-align:right;line-height:1.5}
+  .stamp b{color:#fff}
+  button.btn{font-family:'Montserrat';font-size:12px;font-weight:700;background:var(--gold);color:var(--navy);border:none;border-radius:6px;padding:10px 18px;cursor:pointer}
+  button.btn:hover{filter:brightness(1.05)}
+  button.btn:disabled{opacity:.5;cursor:wait}
+  .wrap{max-width:1280px;margin:0 auto;padding:24px 36px 48px}
+
+  .status{padding:14px 18px;border-radius:8px;margin-bottom:20px;font-size:13px;font-weight:500;line-height:1.6;display:none}
+  .status.err{display:block;background:#fdf0ee;border:1px solid #f0c4bd;color:#7c2d21}
+  .status.load{display:block;background:#fff;border:1px solid var(--line);color:var(--muted)}
+  .status code{background:#f0f3f5;padding:1px 6px;border-radius:4px;font-size:12px}
+
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+  .kpi .lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+  .kpi .val{font-size:18px;font-weight:800;margin-top:6px;color:var(--navy)}
+  .kpi .pct{font-size:11px;font-weight:600;margin-top:4px;color:var(--muted)}
+  .kpi.hl{background:var(--navy);border-color:var(--navy)}
+  .kpi.hl .lbl{color:#9fb2bf}
+  .kpi.hl .val{color:var(--gold)}
+  .kpi.hl .pct{color:#c9d5dd}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;margin-bottom:20px}
+  .card h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--navy);margin-bottom:14px}
+  .funnel-row{display:grid;grid-template-columns:180px 1fr 130px 64px;gap:12px;align-items:center;margin-bottom:10px}
+  .funnel-row .name{font-size:12px;font-weight:600}
+  .funnel-row .bar{height:22px;background:#eef1f4;border-radius:4px;overflow:hidden}
+  .funnel-row .bar span{display:block;height:100%;border-radius:4px}
+  .funnel-row .amt{font-size:12px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+  .funnel-row .p{font-size:11px;font-weight:700;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+  .chartbox{position:relative;height:280px}
+
+  .filters{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  select,input[type=text]{font-family:'Montserrat';font-size:12px;font-weight:500;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+  input[type=text]{flex:1;min-width:200px}
+  select:focus,input:focus{outline:2px solid var(--gold);outline-offset:1px}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead th{background:var(--navy);color:#fff;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.6px;padding:10px 8px;text-align:right;cursor:pointer;user-select:none;white-space:nowrap}
+  thead th:first-child,thead th:nth-child(2){text-align:left}
+  thead th:hover{background:var(--navy-2)}
+  tbody td{padding:8px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+  tbody td:first-child,tbody td:nth-child(2){text-align:left}
+  tbody tr:hover{background:#f8fafb}
+  .desc{font-weight:600;max-width:260px}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#eef1f4;color:var(--navy)}
+  .execbar{width:90px;height:8px;background:#eef1f4;border-radius:4px;display:inline-block;vertical-align:middle;margin-right:6px;overflow:hidden}
+  .execbar i{display:block;height:100%;background:var(--gold)}
+  .neg{color:var(--bad);font-weight:700}
+  .alert{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 12px;border-radius:6px;margin-bottom:8px;font-size:12px;font-weight:500;background:#fafbfc;border:1px solid var(--line)}
+  .alert .dot{width:10px;height:10px;border-radius:50%}
+  .alert.red .dot{background:var(--bad)}
+  .alert.amber .dot{background:#d98b00}
+  .alert b{font-weight:700}
+  .alert .amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .alert.red .amt{color:var(--bad)}
+  .alert.amber .amt{color:#a86b00}
+  tfoot td{padding:10px 8px;font-weight:800;background:#f0f3f5;text-align:right;font-variant-numeric:tabular-nums;border-top:2px solid var(--navy)}
+  tfoot td:first-child{text-align:left}
+  .note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5}
+
+  @media(max-width:900px){
+    .kpis{grid-template-columns:repeat(3,1fr)}
+    .grid2{grid-template-columns:1fr}
+    .wrap{padding:16px}
+    .funnel-row{grid-template-columns:110px 1fr 100px 50px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Dirección General de Emprendedores — Ejecución Presupuestaria</h1>
+    <div class="sub">Unidad Ejecutora <b>3194</b> · Ministerio de Desarrollo Económico · GCBA · <b>Datos en vivo desde Google Sheets</b></div>
+  </div>
+  <div class="refresh">
+    <div class="stamp" id="stamp">—</div>
+    <button class="btn" id="btnRefresh">Actualizar</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="status load" id="status">Cargando datos de la planilla…</div>
+  <div id="app" style="display:none">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <h2>Cadena de ejecución del gasto</h2>
+      <div id="funnel"></div>
+      <div class="note">Porcentajes sobre crédito vigente. Devengado/Vigente es el indicador de ejecución de referencia.</div>
+    </div>
+
+    <div class="card" id="alertCard" style="display:none">
+      <h2>Alertas de gestión</h2>
+      <div id="alertas"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card"><h2>Vigente vs. Devengado por programa</h2><div class="chartbox"><canvas id="chPrograma"></canvas></div></div>
+      <div class="card"><h2>Vigente vs. Devengado por inciso</h2><div class="chartbox"><canvas id="chInciso"></canvas></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Top 10 partidas por crédito vigente</h2>
+      <div class="chartbox" style="height:340px"><canvas id="chTop"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2>Detalle por partida</h2>
+      <div class="filters">
+        <select id="fPrograma"><option value="">Todos los programas</option></select>
+        <select id="fInciso"><option value="">Todos los incisos</option></select>
+        <select id="fActividad"><option value="">Todas las actividades</option></select>
+        <input type="text" id="fBuscar" placeholder="Buscar descripción…">
+      </div>
+      <div style="overflow-x:auto">
+      <table id="tabla">
+        <thead><tr>
+          <th data-k="desc">Descripción</th>
+          <th data-k="act">Prog / Act / Partida</th>
+          <th data-k="sancion">Sanción</th>
+          <th data-k="vigente">Vigente</th>
+          <th data-k="devengado">Devengado</th>
+          <th data-k="pagado">Pagado</th>
+          <th data-k="disponible">Disponible</th>
+          <th data-k="exec">% Ejec.</th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot><tr id="totRow"></tr></tfoot>
+      </table>
+      </div>
+      <div class="note">% Ejec. = Devengado / Vigente. Ordenable por encabezados. Los datos se leen de la planilla al abrir la página y con el botón Actualizar.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ CONFIGURACIÓN ============ */
+const PUB_ID = "2PACX-1vRE76SifJaGodU8xwKlemAhTjpu1eG8pPBmLjpeKmXxIqps5MNjvLHpc6kmFTwKjw";
+const SHEET_ID = "1aTNdX2y1k0QSnn0tDwDuU-Xum18Ryu2X";
+const GID = "369783262";
+/* ======================================= */
+
+const CSV_URLS = [
+  `https://docs.google.com/spreadsheets/d/e/${PUB_ID}/pub?output=csv&gid=${GID}`,
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`,
+];
+
+let rows = [], T = {}, charts = {};
+let sortK='vigente', sortDir=-1;
+
+const fM = v => {
+  const a = Math.abs(v), sign = v < 0 ? '-' : '';
+  if (a >= 1e9) return sign + '$' + (a/1e9).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' MM';
+  if (a >= 1e6) return sign + '$' + (a/1e6).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1}) + ' M';
+  if (a >= 1e3) return sign + '$' + (a/1e3).toLocaleString('es-AR',{maximumFractionDigits:0}) + ' mil';
+  return sign + '$' + a.toLocaleString('es-AR',{maximumFractionDigits:0});
+};
+const fAxis = v => {
+  const a = Math.abs(v);
+  if (a >= 1e9) return '$' + (v/1e9).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' MM';
+  if (a >= 1e6) return '$' + (v/1e6).toLocaleString('es-AR',{maximumFractionDigits:0}) + ' M';
+  if (a >= 1e3) return '$' + (v/1e3).toLocaleString('es-AR',{maximumFractionDigits:0}) + ' mil';
+  return '$' + v;
+};
+const fN = v => v.toLocaleString('es-AR',{maximumFractionDigits:0});
+const num = s => {
+  if (s == null) return 0;
+  s = String(s).trim().replace(/["\s$%]/g,'');
+  if (!s || s === '-') return 0;
+  const neg = /^\(.*\)$/.test(s) || s.startsWith('-');
+  s = s.replace(/[()\-]/g,'');
+  const lastDot = s.lastIndexOf('.'), lastCom = s.lastIndexOf(',');
+  if (lastDot > -1 && lastCom > -1){
+    // ambos separadores: el último es el decimal
+    if (lastCom > lastDot) s = s.replace(/\./g,'').replace(',', '.');   // es-AR: 1.234.567,89
+    else s = s.replace(/,/g,'');                                        // en-US: 1,234,567.89
+  } else if (lastCom > -1){
+    const decimal = (s.match(/,/g).length === 1) && /,\d{1,2}$/.test(s);
+    s = decimal ? s.replace(',', '.') : s.replace(/,/g,'');
+  } else if (lastDot > -1){
+    const parts = s.split('.');
+    if (parts.length > 2 || parts[parts.length-1].length === 3) s = s.replace(/\./g,'');
+  }
+  const v = parseFloat(s);
+  return isNaN(v) ? 0 : (neg ? -v : v);
+};
+
+function parseCSV(text){
+  const out = []; let row = [], cell = '', inQ = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQ){
+      if (c === '"' && text[i+1] === '"'){ cell += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else cell += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ','){ row.push(cell); cell=''; }
+      else if (c === '\n' || c === '\r'){
+        if (cell !== '' || row.length){ row.push(cell); out.push(row); row=[]; cell=''; }
+      } else cell += c;
+    }
+  }
+  if (cell !== '' || row.length){ row.push(cell); out.push(row); }
+  return out;
+}
+
+async function load(){
+  const st = document.getElementById('status');
+  const btn = document.getElementById('btnRefresh');
+  st.className = 'status load'; st.textContent = 'Cargando datos de la planilla…';
+  btn.disabled = true;
+  try {
+    let text = null, lastErr = null;
+    for (const url of CSV_URLS){
+      try {
+        const res = await fetch(url, {cache:'no-store'});
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const t = await res.text();
+        if (t.trim().startsWith('<')) throw new Error('respuesta HTML');
+        text = t; break;
+      } catch(e){ lastErr = e; }
+    }
+    if (text === null) throw lastErr || new Error('sin respuesta');
+    const all = parseCSV(text);
+
+    // Detectar fila de encabezado: la que contiene "Unidad Ejecutora" o "Programa"
+    let hIdx = all.findIndex(r => r.some(c => /unidad ejecutora/i.test(c)));
+    if (hIdx === -1) hIdx = all.findIndex(r => r.some(c => /^programa$/i.test(c.trim())));
+    if (hIdx === -1) hIdx = 0;
+    const header = all[hIdx].map(c => c.trim().toLowerCase());
+    const col = name => header.findIndex(h => h.includes(name));
+    const C = {
+      prog: col('programa'), act: col('actividad'), inciso: col('inciso'),
+      pp: col('partida principal'), ppar: col('partida parcial'),
+      desc: col('descripción') !== -1 ? col('descripción') : col('descripcion'),
+      sancion: col('sanción') !== -1 ? col('sanción') : col('sancion'),
+      vigente: col('vigente'), preventivo: col('preventivo'),
+      definitivo: col('definitivo'), devengado: col('devengado'),
+      pagado: col('pagado'), disponible: col('disponible')
+    };
+    if (C.vigente === -1 || C.devengado === -1) throw new Error('no se reconocen las columnas del reporte');
+
+    rows = [];
+    for (let i = hIdx + 1; i < all.length; i++){
+      const r = all[i];
+      const prog = (r[C.prog]||'').trim();
+      if (!prog || isNaN(+prog)) continue; // salta fila de totales y vacías
+      const inciso = (r[C.inciso]||'').trim();
+      rows.push({
+        prog, act: (r[C.act]||'').trim(),
+        part: inciso + '.' + (r[C.pp]||'').trim() + '.' + (r[C.ppar]||'').trim(),
+        inciso,
+        desc: (r[C.desc]||'').trim() || '(sin descripción)',
+        sancion: num(r[C.sancion]), vigente: num(r[C.vigente]),
+        preventivo: num(r[C.preventivo]), definitivo: num(r[C.definitivo]),
+        devengado: num(r[C.devengado]), pagado: num(r[C.pagado]),
+        disponible: num(r[C.disponible]),
+      });
+    }
+    rows.forEach(r => r.exec = r.vigente > 0 ? r.devengado / r.vigente * 100 : 0);
+    if (!rows.length) throw new Error('la planilla no devolvió filas de datos');
+
+    const sum = k => rows.reduce((a,r)=>a+r[k],0);
+    T = {sancion:sum('sancion'),vigente:sum('vigente'),definitivo:sum('definitivo'),
+         devengado:sum('devengado'),pagado:sum('pagado'),disponible:sum('disponible')};
+
+    st.style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('stamp').innerHTML =
+      `Última lectura de la planilla:<br><b>${new Date().toLocaleString('es-AR')}</b> · ${rows.length} partidas`;
+    buildFilters(); renderAll();
+  } catch(e){
+    st.className = 'status err';
+    st.innerHTML = `<b>No se pudieron cargar los datos.</b> (${e.message})<br>
+      Verificá que la planilla esté publicada: en Google Sheets, <code>Archivo → Compartir → Publicar en la web</code>,
+      o que el acceso sea "Cualquier persona con el enlace puede ver". Luego tocá <b>Actualizar</b>.`;
+  } finally { btn.disabled = false; }
+}
+
+function pct(v){ return (v/T.vigente*100).toLocaleString('es-AR',{maximumFractionDigits:1}) + '%'; }
+
+function renderAll(){
+  // KPIs
+  document.getElementById('kpis').innerHTML = [
+    ['Sanción', fM(T.sancion), ''],
+    ['Vigente', fM(T.vigente), T.sancion>0 ? ((T.vigente/T.sancion-1)*100>=0?'+':'')+((T.vigente/T.sancion-1)*100).toFixed(1)+'% vs. sanción' : ''],
+    ['Definitivo', fM(T.definitivo), pct(T.definitivo)+' del vigente'],
+    ['Devengado', fM(T.devengado), pct(T.devengado)+' del vigente', true],
+    ['Pagado', fM(T.pagado), pct(T.pagado)+' del vigente'],
+    ['Disponible', fM(T.disponible), pct(T.disponible)+' del vigente'],
+  ].map(([l,v,p,hl])=>`<div class="kpi${hl?' hl':''}"><div class="lbl">${l}</div><div class="val">${v}</div><div class="pct">${p}</div></div>`).join('');
+
+  // Funnel
+  const stages = [
+    ['Vigente', T.vigente, '#153244'],
+    ['Comprometido (Definitivo)', T.definitivo, '#1e4258'],
+    ['Devengado', T.devengado, '#F5C400'],
+    ['Pagado', T.pagado, '#d9ad00'],
+  ];
+  document.getElementById('funnel').innerHTML = stages.map(([n,v,c])=>
+    `<div class="funnel-row"><div class="name">${n}</div>
+     <div class="bar"><span style="width:${T.vigente?Math.max(v/T.vigente*100,0):0}%;background:${c}"></span></div>
+     <div class="amt">${fM(v)}</div><div class="p">${pct(v)}</div></div>`).join('');
+
+  // Alertas de gestión
+  const alerts = [];
+  rows.filter(r=>r.disponible < -1).sort((a,b)=>a.disponible-b.disponible).forEach(r=>
+    alerts.push(['red', `<b>Disponible negativo</b> — ${r.desc} <span class="tag">${r.prog}</span> <span class="tag">${r.act}</span> <span class="tag">${r.part}</span>`, fM(r.disponible)]));
+  const umbral = T.vigente * 0.02; // partidas relevantes: ≥2% del vigente total
+  rows.filter(r=>r.vigente >= umbral && r.devengado === 0 && r.definitivo === 0)
+      .sort((a,b)=>b.vigente-a.vigente).slice(0,5).forEach(r=>
+    alerts.push(['amber', `<b>Crédito sin movimiento</b> — ${r.desc} <span class="tag">${r.prog}</span> <span class="tag">${r.act}</span> <span class="tag">${r.part}</span>`, fM(r.vigente)]));
+  const ac = document.getElementById('alertCard');
+  if (alerts.length){
+    ac.style.display = 'block';
+    document.getElementById('alertas').innerHTML = alerts.map(([t,txt,amt])=>
+      `<div class="alert ${t}"><span class="dot"></span><span>${txt}</span><span class="amt">${amt}</span></div>`).join('');
+  } else ac.style.display = 'none';
+
+  // Charts
+  Chart.defaults.font.family = 'Montserrat';
+  Chart.defaults.font.size = 11;
+  Object.values(charts).forEach(c=>c.destroy()); charts = {};
+  const barOpts = {responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{weight:'600'}}},
+      tooltip:{callbacks:{label:c=>c.dataset.label+': '+fM(c.parsed.y ?? c.parsed.x)}}},
+    scales:{y:{ticks:{callback:fAxis},grid:{color:'#eef1f4'}},x:{grid:{display:false}}}};
+
+  const aggBy = key => {
+    const m = {};
+    rows.forEach(r=>{const k=r[key]; m[k]=m[k]||{v:0,d:0}; m[k].v+=r.vigente; m[k].d+=r.devengado;});
+    return m;
+  };
+  const mp = aggBy('prog');
+  charts.p = new Chart(chPrograma,{type:'bar',data:{labels:Object.keys(mp).map(k=>'Programa '+k),
+    datasets:[{label:'Vigente',data:Object.values(mp).map(o=>o.v),backgroundColor:'#153244',borderRadius:4},
+              {label:'Devengado',data:Object.values(mp).map(o=>o.d),backgroundColor:'#F5C400',borderRadius:4}]},options:barOpts});
+  const mi = aggBy('inciso');
+  charts.i = new Chart(chInciso,{type:'bar',data:{labels:Object.keys(mi).sort().map(k=>'Inciso '+k),
+    datasets:[{label:'Vigente',data:Object.keys(mi).sort().map(k=>mi[k].v),backgroundColor:'#153244',borderRadius:4},
+              {label:'Devengado',data:Object.keys(mi).sort().map(k=>mi[k].d),backgroundColor:'#F5C400',borderRadius:4}]},options:barOpts});
+  const top = [...rows].sort((a,b)=>b.vigente-a.vigente).slice(0,10);
+  charts.t = new Chart(chTop,{type:'bar',data:{
+    labels:top.map(r=>r.desc.length>34?r.desc.slice(0,32)+'…':r.desc),
+    datasets:[{label:'Vigente',data:top.map(r=>r.vigente),backgroundColor:'#153244',borderRadius:4},
+              {label:'Devengado',data:top.map(r=>r.devengado),backgroundColor:'#F5C400',borderRadius:4}]},
+    options:{...barOpts,indexAxis:'y',
+      scales:{x:{ticks:{callback:fAxis},grid:{color:'#eef1f4'}},y:{grid:{display:false},ticks:{font:{size:10,weight:'600'}}}}}});
+
+  renderTable();
+}
+
+function buildFilters(){
+  const opt = (arr,first) => `<option value="">${first}</option>` + arr.map(a=>`<option>${a}</option>`).join('');
+  const progs = [...new Set(rows.map(r=>r.prog))].sort((a,b)=>+a-+b);
+  fPrograma.innerHTML = opt(progs.map(p=>p),'Todos los programas');
+  const incisos = [...new Set(rows.map(r=>r.inciso))].sort();
+  fInciso.innerHTML = opt(incisos,'Todos los incisos');
+  fillActs();
+}
+function fillActs(){
+  const p = fPrograma.value;
+  const acts = [...new Set(rows.filter(r=>!p||r.prog===p).map(r=>r.act))].sort((a,b)=>+a-+b);
+  fActividad.innerHTML = '<option value="">Todas las actividades</option>' + acts.map(a=>`<option>${a}</option>`).join('');
+}
+
+function renderTable(){
+  const p = fPrograma.value, i = fInciso.value, a = fActividad.value, q = fBuscar.value.toLowerCase();
+  let f = rows.filter(r=>(!p||r.prog===p)&&(!i||r.inciso===i)&&(!a||r.act===a)&&(!q||r.desc.toLowerCase().includes(q)));
+  f.sort((x,y)=>{
+    const vx=x[sortK], vy=y[sortK];
+    return (typeof vx==='string' ? vx.localeCompare(vy) : vx-vy)*sortDir;
+  });
+  document.querySelector('#tabla tbody').innerHTML = f.map(r=>`<tr>
+    <td class="desc">${r.desc}</td>
+    <td><span class="tag">${r.prog}</span> <span class="tag">${r.act}</span> <span class="tag">${r.part}</span></td>
+    <td>${fN(r.sancion)}</td><td>${fN(r.vigente)}</td><td>${fN(r.devengado)}</td><td>${fN(r.pagado)}</td>
+    <td class="${r.disponible<0?'neg':''}">${fN(r.disponible)}</td>
+    <td><span class="execbar"><i style="width:${Math.min(r.exec,100)}%"></i></span>${r.exec.toFixed(1)}%</td>
+  </tr>`).join('');
+  const s=k=>f.reduce((acc,r)=>acc+r[k],0);
+  const tv=s('vigente'), td=s('devengado');
+  document.getElementById('totRow').innerHTML =
+    `<td>Total (${f.length} partidas)</td><td></td><td>${fN(s('sancion'))}</td><td>${fN(tv)}</td><td>${fN(td)}</td><td>${fN(s('pagado'))}</td><td class="${s('disponible')<0?'neg':''}">${fN(s('disponible'))}</td><td>${tv?(td/tv*100).toFixed(1):0}%</td>`;
+}
+
+document.querySelectorAll('thead th').forEach(th=>th.onclick=()=>{
+  const k = th.dataset.k;
+  if(sortK===k) sortDir*=-1; else {sortK=k; sortDir=-1;}
+  renderTable();
+});
+[fInciso,fActividad].forEach(el=>el.onchange=renderTable);
+fPrograma.onchange=()=>{fillActs();renderTable()};
+fBuscar.oninput=renderTable;
+document.getElementById('btnRefresh').onclick=load;
+load();
+</script>
+</body>
+</html>
